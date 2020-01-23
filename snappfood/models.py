@@ -19,6 +19,7 @@ class City(models.Model):
 
 
 class Address(models.Model):
+    user = models.ForeignKey("snappfood.User", on_delete=models.PROTECT, null=True, related_name="address")
     city = models.ForeignKey(City, on_delete=models.PROTECT)
     x = models.IntegerField()
     y = models.IntegerField()
@@ -28,7 +29,7 @@ class Address(models.Model):
 
 
 class Shop(models.Model):
-    address = models.OneToOneField(Address, on_delete=models.PROTECT)
+    address = models.OneToOneField(Address, on_delete=models.PROTECT, related_name="shop")
     about_text = models.TextField()
     name = models.CharField(max_length=30)
     minimum_bill_value = models.IntegerField()
@@ -38,7 +39,7 @@ class Admin(models.Model):
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     username = models.CharField(max_length=20, unique=True)
     password = models.CharField(max_length=128)
-    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="admin")
 
 
 class Category(models.Model):
@@ -46,7 +47,7 @@ class Category(models.Model):
 
 
 class Food(models.Model):
-    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="asghar")
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="food")
     price = models.IntegerField()
     name = models.CharField(max_length=100)
     about = models.TextField()
@@ -60,31 +61,31 @@ class User(models.Model):
     phone_number = models.CharField(max_length=20, unique=True)
     email = models.EmailField()
     password = models.CharField(max_length=128)
-    favorite = models.ManyToManyField(Food)
+    favorite = models.ManyToManyField(Food, related_name="liker")
 
 
 class Cart(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    items = models.ManyToManyField(Food)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
+    items = models.ManyToManyField(Food, related_name="cart")
 
 
 class Wallet(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="wallet")
 
 
 class Discount(models.Model):
-    users = models.ManyToManyField(User)
+    users = models.ManyToManyField(User, related_name="discount")
     persent = models.IntegerField()
 
 
 class Invoice(models.Model):
-    items = models.ManyToManyField(Food)
+    items = models.ManyToManyField(Food, related_name="invoice")
     status = models.CharField(max_length=20, choices=InvoiceStatusConsts.states)
-    address = models.ForeignKey(Address, on_delete=models.PROTECT)
-    discount = models.ForeignKey(Discount, on_delete=models.PROTECT, blank=True, null=True)
+    address = models.ForeignKey(Address, on_delete=models.PROTECT, related_name="invoice")
+    discount = models.ForeignKey(Discount, on_delete=models.PROTECT, blank=True, null=True, related_name="invoice")
 
 
 class Comment(models.Model):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="comment")
     comment = models.IntegerField()
     text = models.TextField()
