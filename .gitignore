@@ -1,3 +1,5 @@
+static
+
 #######Django#######
 #gunicorn
 djangosql.sock
