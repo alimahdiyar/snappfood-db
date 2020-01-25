@@ -230,6 +230,9 @@ def shop_list_view(request):
     INNER JOIN "snappfood_city" ON ("snappfood_address"."city_id" = "snappfood_city"."id")
     '''
 
+    if 'qs' in request.GET:
+        query += ''' WHERE "snappfood_shop"."name" LIKE '%''' + request.GET['qs'] + '''%'
+                '''
     with connection.cursor() as cursor:
         try:
             cursor.execute(query)
