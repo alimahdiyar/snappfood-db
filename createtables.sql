@@ -34,7 +34,7 @@ CREATE TABLE "snappfood_food" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, 
 --
 -- Create model Invoice
 --
-CREATE TABLE "snappfood_invoice" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "status" varchar(20) NOT NULL, "address_id" integer NOT NULL REFERENCES "snappfood_address" ("id") DEFERRABLE INITIALLY DEFERRED, "discount_id" integer NULL REFERENCES "snappfood_discount" ("id") DEFERRABLE INITIALLY DEFERRED);
+CREATE TABLE "snappfood_invoice" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "amount" integer NOT NULL, "status" varchar(20) NOT NULL, "address_id" integer NOT NULL REFERENCES "snappfood_address" ("id") DEFERRABLE INITIALLY DEFERRED, "discount_id" integer NULL REFERENCES "snappfood_discount" ("id") DEFERRABLE INITIALLY DEFERRED);
 CREATE TABLE "snappfood_invoice_items" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "invoice_id" integer NOT NULL REFERENCES "snappfood_invoice" ("id") DEFERRABLE INITIALLY DEFERRED, "food_id" integer NOT NULL REFERENCES "snappfood_food" ("id") DEFERRABLE INITIALLY DEFERRED);
 --
 -- Create model Shop
@@ -50,20 +50,28 @@ CREATE TABLE "snappfood_user_favorite" ("id" integer NOT NULL PRIMARY KEY AUTOIN
 --
 CREATE TABLE "snappfood_wallet" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "user_id" integer NOT NULL UNIQUE REFERENCES "snappfood_user" ("id") DEFERRABLE INITIALLY DEFERRED);
 --
--- Add field shop to food
+-- Add field wallet to invoice
 --
-ALTER TABLE "snappfood_food" RENAME TO "snappfood_food__old";
-CREATE TABLE "snappfood_food" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "price" integer NOT NULL, "name" varchar(100) NOT NULL, "about" text NOT NULL, "discount" integer NOT NULL, "shop_id" integer NOT NULL REFERENCES "snappfood_shop" ("id") DEFERRABLE INITIALLY DEFERRED);
-INSERT INTO "snappfood_food" ("id", "price", "name", "about", "discount", "shop_id") SELECT "id", "price", "name", "about", "discount", NULL FROM "snappfood_food__old";
-DROP TABLE "snappfood_food__old";
-CREATE INDEX "snappfood_invoice_address_id_5355af61" ON "snappfood_invoice" ("address_id");
-CREATE INDEX "snappfood_invoice_discount_id_ce7ad8f6" ON "snappfood_invoice" ("discount_id");
+ALTER TABLE "snappfood_invoice" RENAME TO "snappfood_invoice__old";
+CREATE TABLE "snappfood_invoice" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "amount" integer NOT NULL, "status" varchar(20) NOT NULL, "address_id" integer NOT NULL REFERENCES "snappfood_address" ("id") DEFERRABLE INITIALLY DEFERRED, "discount_id" integer NULL REFERENCES "snappfood_discount" ("id") DEFERRABLE INITIALLY DEFERRED, "wallet_id" integer NOT NULL REFERENCES "snappfood_wallet" ("id") DEFERRABLE INITIALLY DEFERRED);
+INSERT INTO "snappfood_invoice" ("id", "amount", "status", "address_id", "discount_id", "wallet_id") SELECT "id", "amount", "status", "address_id", "discount_id", NULL FROM "snappfood_invoice__old";
+DROP TABLE "snappfood_invoice__old";
 CREATE UNIQUE INDEX "snappfood_invoice_items_invoice_id_food_id_4439aa21_uniq" ON "snappfood_invoice_items" ("invoice_id", "food_id");
 CREATE INDEX "snappfood_invoice_items_invoice_id_c7da4eb7" ON "snappfood_invoice_items" ("invoice_id");
 CREATE INDEX "snappfood_invoice_items_food_id_b0746a01" ON "snappfood_invoice_items" ("food_id");
 CREATE UNIQUE INDEX "snappfood_user_favorite_user_id_food_id_bab8eb93_uniq" ON "snappfood_user_favorite" ("user_id", "food_id");
 CREATE INDEX "snappfood_user_favorite_user_id_09ea615c" ON "snappfood_user_favorite" ("user_id");
 CREATE INDEX "snappfood_user_favorite_food_id_e0f8e705" ON "snappfood_user_favorite" ("food_id");
+CREATE INDEX "snappfood_invoice_address_id_5355af61" ON "snappfood_invoice" ("address_id");
+CREATE INDEX "snappfood_invoice_discount_id_ce7ad8f6" ON "snappfood_invoice" ("discount_id");
+CREATE INDEX "snappfood_invoice_wallet_id_d065ea89" ON "snappfood_invoice" ("wallet_id");
+--
+-- Add field shop to food
+--
+ALTER TABLE "snappfood_food" RENAME TO "snappfood_food__old";
+CREATE TABLE "snappfood_food" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "price" integer NOT NULL, "name" varchar(100) NOT NULL, "about" text NOT NULL, "discount" integer NOT NULL, "shop_id" integer NOT NULL REFERENCES "snappfood_shop" ("id") DEFERRABLE INITIALLY DEFERRED);
+INSERT INTO "snappfood_food" ("id", "price", "name", "about", "discount", "shop_id") SELECT "id", "price", "name", "about", "discount", NULL FROM "snappfood_food__old";
+DROP TABLE "snappfood_food__old";
 CREATE INDEX "snappfood_food_shop_id_fd33b05f" ON "snappfood_food" ("shop_id");
 --
 -- Add field users to discount
@@ -110,4 +118,13 @@ CREATE TABLE "snappfood_address" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMEN
 INSERT INTO "snappfood_address" ("id", "x", "y", "street", "alley", "plaque", "city_id") SELECT "id", "x", "y", "street", "alley", "plaque", NULL FROM "snappfood_address__old";
 DROP TABLE "snappfood_address__old";
 CREATE INDEX "snappfood_address_city_id_0abd6ed4" ON "snappfood_address" ("city_id");
+--
+-- Add field user to address
+--
+ALTER TABLE "snappfood_address" RENAME TO "snappfood_address__old";
+CREATE TABLE "snappfood_address" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "x" integer NOT NULL, "y" integer NOT NULL, "street" varchar(10) NOT NULL, "alley" varchar(10) NOT NULL, "plaque" varchar(10) NOT NULL, "city_id" integer NOT NULL REFERENCES "snappfood_city" ("id") DEFERRABLE INITIALLY DEFERRED, "user_id" integer NULL REFERENCES "snappfood_user" ("id") DEFERRABLE INITIALLY DEFERRED);
+INSERT INTO "snappfood_address" ("id", "x", "y", "street", "alley", "plaque", "city_id", "user_id") SELECT "id", "x", "y", "street", "alley", "plaque", "city_id", NULL FROM "snappfood_address__old";
+DROP TABLE "snappfood_address__old";
+CREATE INDEX "snappfood_address_city_id_0abd6ed4" ON "snappfood_address" ("city_id");
+CREATE INDEX "snappfood_address_user_id_49ab437c" ON "snappfood_address" ("user_id");
 COMMIT;

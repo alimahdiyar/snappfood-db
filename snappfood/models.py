@@ -4,16 +4,6 @@ from django.db import models
 import uuid
 
 
-class InvoiceStatusConsts:
-    NOTDONE = 'NOTDONE'
-    DONE = 'DONE'
-
-    states = (
-        (NOTDONE, "NOTDONE"),
-        (DONE, "DONE"),
-    )
-
-
 class City(models.Model):
     name = models.CharField(max_length=30)
 
@@ -79,8 +69,10 @@ class Discount(models.Model):
 
 
 class Invoice(models.Model):
+    amount = models.IntegerField()
+    wallet = models.ForeignKey(Wallet, related_name="invoice", on_delete=models.PROTECT)
     items = models.ManyToManyField(Food, related_name="invoice")
-    status = models.CharField(max_length=20, choices=InvoiceStatusConsts.states)
+    status = models.CharField(max_length=20)
     address = models.ForeignKey(Address, on_delete=models.PROTECT, related_name="invoice")
     discount = models.ForeignKey(Discount, on_delete=models.PROTECT, blank=True, null=True, related_name="invoice")
 

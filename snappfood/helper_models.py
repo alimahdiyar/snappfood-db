@@ -2,7 +2,13 @@ import copy
 
 from django.db import connection
 
+class InvoiceStatusConsts:
+    NOT_PAID = "پرداخت نشده"
+
 def srlz(obj):
+    if obj is None or type(obj) in [int, str]:
+        return obj
+
     if type(obj) == dict:
         the_dict = copy.deepcopy(obj)
     else:
@@ -16,21 +22,28 @@ def srlz(obj):
             for x in the_dict[i]:
                 the_dict[i][x] = srlz(the_dict[i][x])
         elif type(the_dict[i]) not in [int, str]:
-            print(the_dict[i])
-            the_dict[i] = the_dict[i].serializee()
+            the_dict[i] = srlz(the_dict[i])
 
     return the_dict
+
 
 class ModelField:
     def __init__(self, name, type):
         self.name = name
         self.type = type
 
+
 class Model:
     table_name_prefix = ''
+
     def __init__(self, **kwargs):
         for key in kwargs:
             setattr(self, key, kwargs[key])
+
+    def update(self, **kwargs):
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+        return self
 
     def serializee(self):
         return srlz(self)
@@ -67,30 +80,34 @@ class ShopModel(Model):
             INNER JOIN "snappfood_city" ON ("snappfood_address"."city_id" = "snappfood_city"."id")
             WHERE "snappfood_shop"."id" = %d
             ''' % (
-                getattr(self, 'id'),
-            )
+            self.id,
+        )
 
         with connection.cursor() as cursor:
             try:
                 cursor.execute(query)
-                fetch_res = cursor.fetchone()
+                res = cursor.fetchone()
             except Exception as ex:
                 print(str(ex))
                 raise ex
-        print(fetch_res)
-        for res in fetch_res:
-            self.items.append(FoodModel(
-                    id=res[0],
-                    name=res[1],
-                    about=res[2],
-                    price=res[3],
-                    discount=res[4],
-                    shop=ShopModel(
-                        id=res[5]
-                    ).read_from_db()
-                ).serializee()
+        self.update(
+            id=res[0],
+            name=res[1],
+            about_text=res[2],
+            minimum_bill_value=res[3],
+            address=AddressModel(
+                id=res[4],
+                street=res[5],
+                alley=res[6],
+                plaque=res[7],
+                city=CityModel(
+                    id=res[8],
+                    name=res[9],
+                )
             )
+        ).serializee()
 
+        return self
 
 
 class AdminModel(Model):
@@ -116,16 +133,17 @@ class CartModel(Model):
 
         self.items = []
         query = '''
-        SELECT "snappfood_food"."id",
-        "snappfood_food"."name",
-        "snappfood_food"."about",
-        "snappfood_food"."price",
-        "snappfood_food"."discount"
-        "snappfood_food"."shop_id"
-        FROM "snappfood_food" INNER JOIN "snappfood_cart_items"
-        ON ("snappfood_food"."id" = "snappfood_cart_items"."food_id")
-        WHERE "snappfood_cart_items"."cart_id" = %d
-        ''' % (
+            SELECT "snappfood_food"."id",
+            "snappfood_food"."name",
+            "snappfood_food"."about",
+            "snappfood_food"."price",
+            "snappfood_food"."discount",
+            "snappfood_food"."shop_id"
+            FROM "snappfood_food"
+            INNER JOIN "snappfood_cart_items"
+            ON ("snappfood_food"."id" = "snappfood_cart_items"."food_id")
+            WHERE "snappfood_cart_items"."cart_id" = %d
+            ''' % (
             self.id,
         )
 
@@ -139,15 +157,15 @@ class CartModel(Model):
         print(fetch_res)
         for res in fetch_res:
             self.items.append(FoodModel(
-                    id=res[0],
-                    name=res[1],
-                    about=res[2],
-                    price=res[3],
-                    discount=res[4],
-                    shop=ShopModel(
-                        id=res[5]
-                    ).read_from_db()
-                ).serializee()
+                id=res[0],
+                name=res[1],
+                about=res[2],
+                price=res[3],
+                discount=res[4],
+                shop=ShopModel(
+                    id=res[5]
+                ).read_from_db()
+            )
             )
 
 

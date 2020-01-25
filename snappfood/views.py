@@ -7,7 +7,7 @@ from django.db import connection
 from django.views.decorators.csrf import csrf_exempt
 
 from snappfood.models import Shop, Address
-from snappfood.helper_models import ShopModel, AddressModel, CityModel, UserModel, CartModel
+from snappfood.helper_models import ShopModel, AddressModel, CityModel, UserModel, CartModel, InvoiceStatusConsts
 
 
 def get_user_id_by_token(req_meta):
@@ -63,6 +63,11 @@ def register_view(request):
     ''' % (
         user_pk,
     )
+    wallet_query = '''
+    INSERT INTO "snappfood_wallet" ("user_id") VALUES (%d)
+    ''' % (
+        user_pk,
+    )
     query = '''
     SELECT "snappfood_user"."token"
     FROM "snappfood_user"
@@ -73,6 +78,7 @@ def register_view(request):
     with connection.cursor() as cursor:
         try:
             cursor.execute(cart_query)
+            cursor.execute(wallet_query)
             cursor.execute(query)
             fetch_res = cursor.fetchone()
         except Exception as ex:
@@ -81,6 +87,7 @@ def register_view(request):
     response_data['token'] = fetch_res[0]
 
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
 
 @csrf_exempt
 def edit_profile_view(request):
@@ -163,7 +170,6 @@ def address_add_view(request):
                                 json_dumps_params={'ensure_ascii': False})
     print(fetch_res)
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
-
 
 
 @csrf_exempt
@@ -252,6 +258,7 @@ def shop_list_view(request):
                                       )
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
 
+
 @csrf_exempt
 def shop_details_view(request, pk):
     response_data = {'result': True, 'errors': [], 'shop': None}
@@ -301,6 +308,7 @@ def shop_details_view(request, pk):
 
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
 
+
 @csrf_exempt
 def city_list_view(request):
     response_data = {'result': True, 'errors': [], 'cities': []}
@@ -322,8 +330,9 @@ def city_list_view(request):
             id=res[0],
             name=res[1],
         ).serializee()
-                                      )
+                                       )
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
 
 @csrf_exempt
 def profile_view(request):
@@ -367,6 +376,193 @@ def profile_view(request):
 
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
 
+
 @csrf_exempt
 def cart_add_view(request):
-    pass
+    user_pk = get_user_id_by_token(request.META)
+    if not user_pk:
+        raise Http404
+
+    response_data = {'result': True, 'errors': []}
+
+    query = '''
+        SELECT "snappfood_cart"."id"
+        FROM "snappfood_user" INNER JOIN "snappfood_cart"
+        ON ("snappfood_cart"."user_id" = "snappfood_user"."id")
+        WHERE ("snappfood_user"."id" = %d);
+        ''' % (
+        user_pk,
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    card_id = fetch_res[0]
+
+    query = '''
+        INSERT INTO "snappfood_cart_items" ("cart_id", "food_id") SELECT %d, %d;
+        ''' % (
+        card_id,
+        int(request.POST['food_id'])
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+
+    return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def cart_remove_view(request):
+    user_pk = get_user_id_by_token(request.META)
+    if not user_pk:
+        raise Http404
+
+    response_data = {'result': True, 'errors': []}
+
+    query = '''
+        SELECT "snappfood_cart"."id"
+        FROM "snappfood_user" INNER JOIN "snappfood_cart"
+        ON ("snappfood_cart"."user_id" = "snappfood_user"."id")
+        WHERE ("snappfood_user"."id" = %d);
+        ''' % (
+        user_pk,
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    card_id = fetch_res[0]
+
+    query = '''
+        DELETE FROM "snappfood_cart_items" WHERE ("cart_id" = %d AND "food_id" = %d);
+        ''' % (
+        card_id,
+        int(request.POST['food_id'])
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+
+    return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def cart_commit_view(request):
+    user_pk = get_user_id_by_token(request.META)
+    if not user_pk:
+        raise Http404
+
+    response_data = {'result': True, 'errors': []}
+
+    query = '''
+        SELECT "snappfood_cart"."id"
+        FROM "snappfood_user" INNER JOIN "snappfood_cart"
+        ON ("snappfood_cart"."user_id" = "snappfood_user"."id")
+        WHERE ("snappfood_user"."id" = %d);
+        ''' % (
+        user_pk,
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    cart_id = fetch_res[0]
+
+    cart = CartModel(id=cart_id)
+
+    query = '''
+        SELECT "snappfood_wallet"."id"
+        FROM "snappfood_user" INNER JOIN "snappfood_wallet"
+        ON ("snappfood_wallet"."user_id" = "snappfood_user"."id")
+        WHERE ("snappfood_user"."id" = %d);
+        ''' % (
+        user_pk,
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    wallet_id = fetch_res[0]
+
+    amount = 0
+    for item in cart.items:
+        amount += item.price
+
+    query = '''
+    INSERT INTO "snappfood_invoice"
+    ("amount", "wallet_id", "status", "address_id", "discount_id")
+    VALUES (%d, %d, '%s', %d, NULL)
+    ''' % (
+        amount,
+        wallet_id,
+        InvoiceStatusConsts.NOT_PAID,
+        int(request.POST['address_id'])
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+            invoice_id = cursor.lastrowid
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+
+    for item in cart.items:
+        query = '''
+            INSERT INTO "snappfood_invoice_items" ("invoice_id", "food_id") SELECT %d, %d;
+        ''' % (
+            invoice_id,
+            item.id,
+        )
+
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(query)
+                fetch_res = cursor.fetchone()
+            except Exception as ex:
+                return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                    json_dumps_params={'ensure_ascii': False})
+
+    query = '''
+        DELETE FROM "snappfood_cart_items"
+        WHERE "snappfood_cart_items"."cart_id" = %d
+    ''' % (
+        cart_id
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
