@@ -12,4 +12,10 @@ urlpatterns = [
    path('address/add/', address_add_view, name='address-add'),
    path('city/list/', city_list_view, name='city-list'),
    path('shop/list/', shop_list_view, name='shop-list'),
+   path('shop/<int:pk>/', shop_details_view, name='shop-details'),
+
+   path('cart/add/<int:food_pk>/', cart_add_view, name='cart-add'),
+   # path('cart/commit/', cart_commit_view, name="cart-commit"),
+   #
+   # path('invoice/commit/', cart_commit_view, name="cart-commit"),
 ]

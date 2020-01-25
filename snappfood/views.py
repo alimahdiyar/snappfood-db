@@ -7,7 +7,7 @@ from django.db import connection
 from django.views.decorators.csrf import csrf_exempt
 
 from snappfood.models import Shop, Address
-from snappfood.helper_models import ShopModel, AddressModel, CityModel, UserModel
+from snappfood.helper_models import ShopModel, AddressModel, CityModel, UserModel, CartModel
 
 
 def get_user_id_by_token(req_meta):
@@ -52,11 +52,34 @@ def register_view(request):
     with connection.cursor() as cursor:
         try:
             cursor.execute(query)
+            user_pk = cursor.lastrowid
             fetch_res = cursor.fetchall()
         except Exception as ex:
             return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
                                 json_dumps_params={'ensure_ascii': False})
-    print(fetch_res)
+
+    cart_query = '''
+    INSERT INTO "snappfood_cart" ("user_id") VALUES (%d)
+    ''' % (
+        user_pk,
+    )
+    query = '''
+    SELECT "snappfood_user"."token"
+    FROM "snappfood_user"
+    WHERE "snappfood_user"."id" = %d;
+    ''' % (
+        user_pk,
+    )
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(cart_query)
+            cursor.execute(query)
+            fetch_res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+    response_data['token'] = fetch_res[0]
+
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt
@@ -230,6 +253,55 @@ def shop_list_view(request):
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt
+def shop_details_view(request, pk):
+    response_data = {'result': True, 'errors': [], 'shop': None}
+    query = '''
+    SELECT "snappfood_shop"."id",
+    "snappfood_shop"."name",
+    "snappfood_shop"."about_text",
+    "snappfood_shop"."minimum_bill_value",
+    "snappfood_address"."id",
+    "snappfood_address"."street",
+    "snappfood_address"."alley",
+    "snappfood_address"."plaque",
+    "snappfood_city"."id",
+    "snappfood_city"."name"
+    FROM "snappfood_shop"
+    INNER JOIN "snappfood_address" ON ("snappfood_shop"."address_id" = "snappfood_address"."id")
+    INNER JOIN "snappfood_city" ON ("snappfood_address"."city_id" = "snappfood_city"."id")
+    WHERE "snappfood_shop"."id" = %d
+    ''' % (
+        pk,
+    )
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)
+            res = cursor.fetchone()
+        except Exception as ex:
+            return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
+                                json_dumps_params={'ensure_ascii': False})
+
+    response_data['shop'] = ShopModel(
+        id=res[0],
+        name=res[1],
+        about_text=res[2],
+        minimum_bill_value=res[3],
+        address=AddressModel(
+            id=res[4],
+            street=res[5],
+            alley=res[6],
+            plaque=res[7],
+            city=CityModel(
+                id=res[8],
+                name=res[9],
+            )
+        )
+    ).serializee()
+
+    return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
+@csrf_exempt
 def city_list_view(request):
     response_data = {'result': True, 'errors': [], 'cities': []}
     query = '''
@@ -265,9 +337,11 @@ def profile_view(request):
     "snappfood_user"."first_name",
     "snappfood_user"."last_name",
     "snappfood_user"."phone_number",
-    "snappfood_user"."email"
-    FROM "snappfood_user" WHERE
-    "snappfood_user"."id" = %d;
+    "snappfood_user"."email",
+    "snappfood_cart"."id"
+    FROM "snappfood_user" INNER JOIN "snappfood_cart"
+    ON ("snappfood_cart"."user_id" = "snappfood_user"."id")
+    WHERE ("snappfood_user"."id" = %d);
     ''' % (
         user_pk,
     )
@@ -275,18 +349,24 @@ def profile_view(request):
     with connection.cursor() as cursor:
         try:
             cursor.execute(query)
-            fetch_res = cursor.fetchall()
+            fetch_res = cursor.fetchone()
         except Exception as ex:
             return JsonResponse({'result': False, 'errors': [str(ex)]}, safe=False,
                                 json_dumps_params={'ensure_ascii': False})
-    print(fetch_res)
-    for res in fetch_res:
-        response_data['profile'] = UserModel(
-            id=res[0],
-            first_name=res[1],
-            last_name=res[2],
-            phone_number=res[3],
-            email=res[4],
-        ).serializee()
+    res = fetch_res
+    response_data['profile'] = UserModel(
+        id=res[0],
+        first_name=res[1],
+        last_name=res[2],
+        phone_number=res[3],
+        email=res[4],
+        cart=CartModel(
+            id=res[5]
+        )
+    ).serializee()
 
     return JsonResponse(response_data, safe=False, json_dumps_params={'ensure_ascii': False})
+
+@csrf_exempt
+def cart_add_view(request):
+    pass
